@@ -1,3 +1,4 @@
+import 'package:bookswapapp/listings.dart';
 import 'package:flutter/material.dart';
 
 class LandingPage extends StatelessWidget {
@@ -27,7 +28,8 @@ class LandingPage extends StatelessWidget {
       height: 20,
     ),
     ElevatedButton(onPressed: () {
-      print('Button Pressed');
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => Listings()),
+      );
     }, 
     style: ElevatedButton.styleFrom(
       backgroundColor: Colors.black,
