@@ -1,9 +1,17 @@
-import 'package:bookswapapp/listings.dart';
-import 'package:bookswapapp/signin.dart';
+import 'package:bookswapapp/screens/listings.dart';
+import 'package:bookswapapp/screens/post_a_book.dart';
+import 'package:bookswapapp/screens/signin.dart';
 import 'package:flutter/material.dart';
-import 'landing_page.dart';
+import 'screens/landing_page.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'services/firebase_options.dart';
+import 'screens/signup.dart';
 
-void main (){
+void main () async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(BookSwap());
 }
 
@@ -27,8 +35,10 @@ class _BookSwapState extends State<BookSwap> {
       initialRoute: '/',
       routes: {
         '/': (context) => LandingPage(),
-        '/home': (context) => Listings(),
-        '/signup': (context) => LoginPage(),
+        '/login': (context) => LoginPage(),
+        '/signup': (context) => Signup(),
+        '/listings': (context) => Listings(),
+        '/postabook':(context) => PostABook(),
       },
     );
   }

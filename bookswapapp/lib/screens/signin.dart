@@ -1,6 +1,6 @@
-import 'package:bookswapapp/main.dart';
 import 'package:flutter/material.dart';
-
+import 'package:bookswapapp/services/auth_service.dart';
+import 'package:bookswapapp/screens/signup.dart';
 
 class BookSwap extends StatelessWidget {
   @override
@@ -15,7 +15,7 @@ class BookSwap extends StatelessWidget {
       routes: {
         '/': (context) => LoginPage(),
         '/home': (context) => HomePage(),
-        '/signup': (context) => SignupPage(),
+        '/signup': (context) => Signup(),
       },
     );
   }
@@ -42,7 +42,7 @@ class _LoginPageState extends State<LoginPage> {
       setState(() => _isLoading = false);
       
       // Navigate to home page
-      Navigator.pushReplacementNamed(context, '/home');
+      Navigator.pushReplacementNamed(context, '/listings');
     }
   }
 
@@ -69,7 +69,7 @@ class _LoginPageState extends State<LoginPage> {
                 Icon(
                   Icons.menu_book_rounded,
                   size: 80,
-                  color: Color(0xFF3B62FF),
+                  color: Color.fromARGB(255, 250, 7, 7),
                 ),
                 SizedBox(height: 20),
                 
@@ -144,7 +144,7 @@ class _LoginPageState extends State<LoginPage> {
                     child: Text(
                       'Forgot Password?',
                       style: TextStyle(
-                        color: Color(0xFF3B62FF),
+                        color: Color.fromARGB(255, 248, 7, 7),
                       ),
                     ),
                   ),
@@ -158,7 +158,7 @@ class _LoginPageState extends State<LoginPage> {
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : _login,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Color(0xFF3B62FF),
+                      backgroundColor: Color.fromARGB(255, 250, 2, 2),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
@@ -203,7 +203,7 @@ class _LoginPageState extends State<LoginPage> {
                         'Sign Up',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF3B62FF),
+                          color: Color.fromARGB(255, 248, 1, 1),
                         ),
                       ),
                     ),
@@ -229,7 +229,7 @@ class HomePage extends StatelessWidget {
           IconButton(
             icon: Icon(Icons.logout),
             onPressed: () {
-              Navigator.pushReplacementNamed(context, '/');
+              Navigator.pushReplacementNamed(context, '/listings');
             },
           ),
         ],
@@ -241,21 +241,4 @@ class HomePage extends StatelessWidget {
   }
 }
 
-// Signup Page (Basic structure)
-class SignupPage extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Sign Up'),
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: Center(
-        child: Text('Signup Page - To be implemented'),
-      ),
-    );
-  }
-}
+  
