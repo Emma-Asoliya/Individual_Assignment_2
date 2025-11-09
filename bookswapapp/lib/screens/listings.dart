@@ -1,9 +1,12 @@
+import 'package:bookswapapp/providers/user_provider.dart';
+import 'package:bookswapapp/screens/swaprequests.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart' hide Settings;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:bookswapapp/screens/post_a_book.dart';
 import 'package:bookswapapp/screens/settings.dart';
 import 'package:bookswapapp/screens/chats.dart';
+import 'package:provider/provider.dart';
 
 class Listings extends StatefulWidget {
   const Listings({super.key});
@@ -61,9 +64,10 @@ class _ListingsState extends State<Listings> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final user = _auth.currentUser;
+ @override
+Widget build(BuildContext context) {
+  final userProvider = Provider.of<UserProvider>(context);
+  final user = userProvider.user;
     
     return Scaffold(
       appBar: AppBar(
@@ -84,7 +88,9 @@ class _ListingsState extends State<Listings> {
           ),
         ] : null,
       ),
-      body: _buildCurrentScreen(user),
+      body: user == null
+        ? Center(child: Text('Please log in to view books'))
+      : _buildCurrentScreen(user),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) {
@@ -101,6 +107,10 @@ class _ListingsState extends State<Listings> {
             icon: Icon(Icons.library_books),
             label: 'My Books',
           ),
+           BottomNavigationBarItem(
+      icon: Icon(Icons.swap_horiz),  
+      label: 'Swaps',                
+    ),
           BottomNavigationBarItem(
             icon: Icon(Icons.chat),
             label: 'Chats',
@@ -138,9 +148,10 @@ class _ListingsState extends State<Listings> {
         return _buildBrowseScreen(user);
       case 1: // My Books - User's Books Only
         return _buildMyBooksScreen(user);
-      case 2: // Chats
+        case 2: return SwapRequests(); 
+      case 3: // Chats
         return ChatsPage();
-      case 3: // Settings
+      case 4: // Settings
         return Settings();
       default:
         return _buildBrowseScreen(user);

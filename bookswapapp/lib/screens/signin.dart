@@ -27,61 +27,25 @@ class _LoginPageState extends State<LoginPage> {
     if (_formKey.currentState!.validate()) {
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       
-      // Show loading state
-      userProvider.setLoading(true);
-      userProvider.clearError();
+      // Use the provider's login method
+      final success = await userProvider.login(
+        _emailController.text.trim(),
+        _passwordController.text.trim(),
+      );
 
-      try {
-        // Sign in with Firebase Auth
-        UserCredential userCredential = await _auth.signInWithEmailAndPassword(
-          email: _emailController.text.trim(),
-          password: _passwordController.text.trim(),
-        );
-
-        final User? user = userCredential.user;
-        
-        // CHECK EMAIL VERIFICATION - CRITICAL FOR ASSIGNMENT
-        if (user != null && !user.emailVerified) {
-          await _auth.signOut(); // Sign them out immediately
+      if (success && userProvider.user != null) {
+        // Check email verification
+        if (!userProvider.user!.emailVerified) {
+          await FirebaseAuth.instance.signOut();
           userProvider.setLoading(false);
-          _showVerificationRequiredDialog(user);
+          _showVerificationRequiredDialog(userProvider.user!);
           return;
         }
 
-        // Only proceed if email is verified
-        if (user != null && user.emailVerified) {
-          final success = await userProvider.login(
-            _emailController.text.trim(),
-            _passwordController.text.trim(),
-          );
-
-          if (success) {
-            // Navigate to listings page on successful login
-            Navigator.pushReplacementNamed(context, '/listings');
-          }
-        }
-
-      } on FirebaseAuthException catch (e) {
-        userProvider.setLoading(false);
-        String errorMessage = 'Login failed. Please try again.';
-        
-        if (e.code == 'user-not-found') {
-          errorMessage = 'No account found with this email.';
-        } else if (e.code == 'wrong-password') {
-          errorMessage = 'Incorrect password. Please try again.';
-        } else if (e.code == 'invalid-email') {
-          errorMessage = 'Invalid email address format.';
-        } else if (e.code == 'user-disabled') {
-          errorMessage = 'This account has been disabled.';
-        } else if (e.code == 'too-many-requests') {
-          errorMessage = 'Too many login attempts. Please try again later.';
-        }
-        
-        userProvider.setError(errorMessage);
-      } catch (e) {
-        userProvider.setLoading(false);
-        userProvider.setError('An unexpected error occurred. Please try again.');
+        // Navigate to listings on successful login
+        Navigator.pushReplacementNamed(context, '/listings');
       }
+      // Error handling is already done in the provider
     }
   }
 
