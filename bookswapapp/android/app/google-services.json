@@ -12,7 +12,20 @@
           "package_name": "com.example.bookswapapp"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "179355861161-sjcalracmsf47n521nvmlal0e238lt2a.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.bookswapapp",
+            "certificate_hash": "d307f069f863f567b7818bf7636566f9e77f6f92"
+          }
+        },
+        {
+          "client_id": "179355861161-0spnslj0gpdv460fuossl1n67d7esjit.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyD0NiN3FLMxfWduS90XWVg4_PRWNyF7b3k"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "179355861161-0spnslj0gpdv460fuossl1n67d7esjit.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "179355861161-h0nqissddiauh1mcj6fomaddjfqpjlio.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.bookswapapp"
+              }
+            }
+          ]
         }
       }
     }
