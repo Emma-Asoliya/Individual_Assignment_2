@@ -9,6 +9,7 @@ import 'package:bookswapapp/screens/signin.dart';
 import 'package:bookswapapp/screens/signup.dart';
 import 'package:bookswapapp/providers/user_provider.dart';
 import 'package:bookswapapp/providers/settings_provider.dart'; 
+import 'screens/swaprequests.dart';
 import 'services/firebase_options.dart';
 
 void main() async {
@@ -48,6 +49,7 @@ class _BookSwapState extends State<BookSwap> {
           '/listings': (context) => const Listings(),
           '/postabook': (context) => const PostABook(),
           '/settings': (context) => const Settings(),
+           '/swaprequests': (context) => const SwapRequests(),
         },
         debugShowCheckedModeBanner: false,
       ),
