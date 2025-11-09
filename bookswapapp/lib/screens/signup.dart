@@ -352,91 +352,128 @@ class _SignupPageState extends State<SignupPage> {
   }
 
   Future<void> _signUp() async {
-    if (_formKey.currentState!.validate()) {
-      setState(() {
-        _isLoading = true;
-      });
+  if (_formKey.currentState!.validate()) {
+    setState(() {
+      _isLoading = true;
+    });
 
-      try {
-        // Create user with Firebase Auth
-        UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
-          email: _emailController.text.trim(),
-          password: _passwordController.text.trim(),
-        );
+    try {
+      print('STARTING SIGNUP PROCESS...');
+      print('Email: ${_emailController.text.trim()}');
+      
+      // 1. Create user with Firebase Auth
+      UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
 
-        final User? user = userCredential.user;
+      final User? user = userCredential.user;
+      
+      if (user != null) {
+        print('USER CREATED: ${user.uid}');
         
-        if (user != null) {
-          // Update display name
-          await user.updateDisplayName('${_firstNameController.text.trim()} ${_lastNameController.text.trim()}');
-          
-          // Send email verification
-          await user.sendEmailVerification();
-
-          // Store additional user data in Firestore
-          await _firestore.collection('users').doc(user.uid).set({
-            'firstName': _firstNameController.text.trim(),
-            'lastName': _lastNameController.text.trim(),
-            'fullName': '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}',
-            'email': _emailController.text.trim(),
-            'emailVerified': false,
-            'createdAt': FieldValue.serverTimestamp(),
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
-
-          // Show verification dialog instead of navigating to app
-          await _showVerificationDialog();
+        // 2. CRITICAL: Force reload and get fresh user instance
+        await user.reload();
+        final User? freshUser = _auth.currentUser;
+        print('Fresh user after reload: ${freshUser?.uid}');
+        
+        if (freshUser == null) {
+          print('USER LOST AFTER RELOAD - This is the problem!');
+          throw Exception('User authentication lost during signup');
         }
 
-      } on FirebaseAuthException catch (e) {
-        String errorMessage = 'An error occurred. Please try again.';
-        
-        if (e.code == 'email-already-in-use') {
-          errorMessage = 'This email is already registered. Please use a different email or sign in.';
-        } else if (e.code == 'weak-password') {
-          errorMessage = 'The password is too weak. Please choose a stronger password.';
-        } else if (e.code == 'invalid-email') {
-          errorMessage = 'The email address is invalid. Please check and try again.';
-        }
-        
-        _showErrorDialog(errorMessage);
-      } catch (e) {
-        _showErrorDialog('An unexpected error occurred. Please try again.');
-      } finally {
-        setState(() {
-          _isLoading = false;
+        // 3. Update display name using fresh user instance
+        await freshUser.updateDisplayName('${_firstNameController.text.trim()} ${_lastNameController.text.trim()}');
+        print('Display name updated');
+
+        // 4. Send email verification using fresh user instance
+        print('ATTEMPTING TO SEND VERIFICATION EMAIL...');
+        await freshUser.sendEmailVerification();
+        print('VERIFICATION EMAIL SENT SUCCESSFULLY!');
+        print('Sent to: ${freshUser.email}');
+
+        // 5. Store user data in Firestore
+        await _firestore.collection('users').doc(freshUser.uid).set({
+          'firstName': _firstNameController.text.trim(),
+          'lastName': _lastNameController.text.trim(),
+          'fullName': '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}',
+          'email': _emailController.text.trim(),
+          'emailVerified': false,
+          'createdAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
         });
+        print('User data saved to Firestore');
+
+        // 6. Show verification dialog
+        await _showVerificationDialog();
+        
+        // 7. Final check
+        print('FINAL CHECK - User still signed in: ${_auth.currentUser != null}');
       }
+
+    } on FirebaseAuthException catch (e) {
+      print('FIREBASE AUTH ERROR: ${e.code} - ${e.message}');
+      String errorMessage = 'An error occurred. Please try again.';
+      
+      if (e.code == 'email-already-in-use') {
+        errorMessage = 'This email is already registered. Please use a different email or sign in.';
+      } else if (e.code == 'weak-password') {
+        errorMessage = 'The password is too weak. Please choose a stronger password.';
+      } else if (e.code == 'invalid-email') {
+        errorMessage = 'The email address is invalid. Please check and try again.';
+      }
+      
+      _showErrorDialog(errorMessage);
+    } catch (e) {
+      print('UNEXPECTED ERROR: $e');
+      _showErrorDialog('An unexpected error occurred: $e');
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
+}
 
   Future<void> _showVerificationDialog() async {
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.email, color: Colors.orange),
-            SizedBox(width: 8),
-            Text('Verify Your Email'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
+  await showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) => AlertDialog(
+      title: Row(
+        children: [
+          Icon(Icons.email, color: Colors.orange),
+          SizedBox(width: 8),
+          Expanded( // ADD THIS
+            child: Text('Verify Your Email'),
+          ),
+        ],
+      ),
+      content: SingleChildScrollView( // ADD THIS
+        child: Column(
+          mainAxisSize: MainAxisSize.min, // ADD THIS
           children: [
             Text(
               'A verification email has been sent to:',
               style: TextStyle(fontSize: 14),
+              textAlign: TextAlign.center,
             ),
             SizedBox(height: 8),
-            Text(
-              _emailController.text.trim(),
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Colors.red,
+            Container(
+              padding: EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: Colors.grey[300]!),
               ),
-              textAlign: TextAlign.center,
+              child: Text(
+                _emailController.text.trim(),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.red,
+                ),
+                textAlign: TextAlign.center,
+              ),
             ),
             SizedBox(height: 16),
             Text(
@@ -455,7 +492,7 @@ class _SignupPageState extends State<SignupPage> {
                 children: [
                   Icon(Icons.info, color: Colors.orange, size: 20),
                   SizedBox(width: 8),
-                  Expanded(
+                  Expanded( // ADD THIS
                     child: Text(
                       'You must verify your email to access the app',
                       style: TextStyle(fontSize: 12, color: Colors.orange[800]),
@@ -466,45 +503,63 @@ class _SignupPageState extends State<SignupPage> {
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context); // Close dialog
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => LoginPage()),
-              );
-            },
-            child: Text('OK, Go to Login'),
-          ),
-          TextButton(
-            onPressed: () async {
-              final User? user = _auth.currentUser;
-              if (user != null) {
-                try {
-                  await user.sendEmailVerification();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Verification email resent!'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Failed to resend email: $e'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              }
-            },
-            child: Text('Resend Email'),
-          ),
-        ],
       ),
-    );
-  }
+      actions: [
+        TextButton(
+          onPressed: () {
+            Navigator.pop(context);
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => LoginPage()),
+            );
+          },
+          child: Text('OK, Go to Login'),
+        ),
+        TextButton(
+  onPressed: () async {
+    final User? user = _auth.currentUser;
+    print('RESEND BUTTON PRESSED');
+    print('Current user: ${user?.uid}');
+    print('Current email: ${user?.email}');
+    
+    if (user != null) {
+      try {
+        print('📤 RESENDING VERIFICATION EMAIL...');
+        await user.sendEmailVerification();
+        print('VERIFICATION EMAIL RESENT SUCCESSFULLY!');
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Verification email resent!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } catch (e) {
+        print('FAILED TO RESEND EMAIL: $e');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to resend email: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } else {
+      print('NO USER SIGNED IN FOR RESEND');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No user signed in. Please sign up again.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  },
+  child: Text('Resend Email'),
+),
+
+      ],
+    ),
+  );
+}
 
   void _showErrorDialog(String message) {
     showDialog(

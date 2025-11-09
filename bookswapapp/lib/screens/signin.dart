@@ -94,47 +94,63 @@ class _LoginPageState extends State<LoginPage> {
           children: [
             Icon(Icons.email, color: Colors.orange),
             SizedBox(width: 8),
-            Text('Email Verification Required'),
+            Expanded( // FIX: Added Expanded to prevent overflow
+              child: Text(
+                'Email Verification Required',
+                style: TextStyle(fontSize: 18),
+              ),
+            ),
           ],
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Please verify your email address before logging in.',
-              style: TextStyle(fontSize: 14),
-            ),
-            SizedBox(height: 12),
-            Text(
-              _emailController.text.trim(),
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Colors.red,
+        content: SingleChildScrollView( // FIX: Added SingleChildScrollView
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Please verify your email address before logging in.',
+                style: TextStyle(fontSize: 14),
+                textAlign: TextAlign.center,
               ),
-              textAlign: TextAlign.center,
-            ),
-            SizedBox(height: 12),
-            Container(
-              padding: EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.orange[50],
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.orange),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.info, color: Colors.orange, size: 20),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'You must verify your email to access BookSwap',
-                      style: TextStyle(fontSize: 12, color: Colors.orange[800]),
-                    ),
+              SizedBox(height: 12),
+              Container(
+                padding: EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: Text(
+                  _emailController.text.trim(),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.red,
                   ),
-                ],
+                  textAlign: TextAlign.center,
+                ),
               ),
-            ),
-          ],
+              SizedBox(height: 12),
+              Container(
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info, color: Colors.orange, size: 20),
+                    SizedBox(width: 8),
+                    Expanded( // FIX: Added Expanded
+                      child: Text(
+                        'You must verify your email to access BookSwap',
+                        style: TextStyle(fontSize: 12, color: Colors.orange[800]),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -391,20 +407,26 @@ class _LoginPageState extends State<LoginPage> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text('Reset Password'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Enter your email to receive a password reset link:'),
-            SizedBox(height: 16),
-            TextFormField(
-              controller: emailController,
-              decoration: InputDecoration(
-                labelText: 'Email',
-                border: OutlineInputBorder(),
+        content: SingleChildScrollView( // FIX: Added SingleChildScrollView
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Enter your email to receive a password reset link:',
+                textAlign: TextAlign.center,
               ),
-              keyboardType: TextInputType.emailAddress,
-            ),
-          ],
+              SizedBox(height: 16),
+              TextFormField(
+                controller: emailController,
+                decoration: InputDecoration(
+                  labelText: 'Email',
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                ),
+                keyboardType: TextInputType.emailAddress,
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
