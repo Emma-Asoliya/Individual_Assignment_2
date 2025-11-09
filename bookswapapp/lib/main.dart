@@ -1,17 +1,17 @@
-import 'package:bookswapapp/providers/user_provider.dart';
+import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:provider/provider.dart'; 
+import 'package:bookswapapp/screens/landing_page.dart';
 import 'package:bookswapapp/screens/listings.dart';
 import 'package:bookswapapp/screens/post_a_book.dart';
+import 'package:bookswapapp/screens/settings.dart';
 import 'package:bookswapapp/screens/signin.dart';
-import 'package:flutter/material.dart';
-import 'screens/landing_page.dart';
-import 'package:firebase_core/firebase_core.dart';
+import 'package:bookswapapp/screens/signup.dart';
+import 'package:bookswapapp/providers/user_provider.dart';
+import 'package:bookswapapp/providers/settings_provider.dart'; 
 import 'services/firebase_options.dart';
-import 'screens/signup.dart';
-import 'package:provider/provider.dart'; 
-import 'providers/settings_provider.dart'; 
 
-
-void main () async {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
@@ -20,37 +20,36 @@ void main () async {
 }
 
 class BookSwap extends StatefulWidget {
-  BookSwap({super.key});
+  const BookSwap({super.key});
 
   @override
   State<BookSwap> createState() => _BookSwapState();
 }
 
 class _BookSwapState extends State<BookSwap> {
-
   @override
   Widget build(BuildContext context) {
-    return MultiProvider( // CHANGE MaterialApp to MultiProvider
+    return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (context) => SettingsProvider()),
-        ChangeNotifierProvider(create: (context) => UserProvider())
-        // Add other providers here as needed
+        ChangeNotifierProvider(create: (context) => UserProvider()),
       ],
-
-      child: MaterialApp( // KEEP MaterialApp inside MultiProvider
+      child: MaterialApp(
         title: 'BookSwap App',
         theme: ThemeData(
-          primarySwatch: Colors.blue,
+          primarySwatch: Colors.red, // Changed to red to match your app
           fontFamily: 'Poppins',
         ),
         initialRoute: '/',
         routes: {
-          '/': (context) => LandingPage(),
-          '/login': (context) => LoginPage(),
-          '/signup': (context) => Signup(),
-          '/listings': (context) => Listings(),
-          '/postabook':(context) => PostABook(),
+          '/': (context) => const LandingPage(),
+          '/login': (context) =>  LoginPage(),
+          '/signup': (context) => const SignupPage(),
+          '/listings': (context) => const Listings(),
+          '/postabook': (context) => const PostABook(),
+          '/settings': (context) => const Settings(),
         },
+        debugShowCheckedModeBanner: false,
       ),
     );
   }

@@ -5,39 +5,35 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
 
-class PostABook extends StatefulWidget {
-  final String? bookId;
-  final Map<String, dynamic>? initialBook;
+class EditBookScreen extends StatefulWidget {
+  final String bookId;
+  final Map<String, dynamic> bookData;
 
-  const PostABook({
+  const EditBookScreen({
     super.key,
-    this.bookId,
-    this.initialBook,
+    required this.bookId,
+    required this.bookData,
   });
 
   @override
-  State<PostABook> createState() => _PostABookState();
+  State<EditBookScreen> createState() => _EditBookScreenState();
 }
 
-class _PostABookState extends State<PostABook> {
+class _EditBookScreenState extends State<EditBookScreen> {
   final _formKey = GlobalKey<FormState>();
   final _firestore = FirebaseFirestore.instance;
-  final _auth = FirebaseAuth.instance;
-  final _storage = FirebaseStorage.instance;
   final _picker = ImagePicker();
 
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _authorController = TextEditingController();
   final TextEditingController _subjectController = TextEditingController();
-  final TextEditingController _priceController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
+  final TextEditingController _priceController = TextEditingController();
 
   String _selectedCondition = 'Like New';
   String _selectedPriceType = 'free';
   File? _selectedImage;
-  String? _existingImageUrl;
   bool _isLoading = false;
-  bool _isEditing = false;
 
   final List<String> _conditions = [
     'New',
@@ -56,49 +52,33 @@ class _PostABookState extends State<PostABook> {
   @override
   void initState() {
     super.initState();
-    _isEditing = widget.bookId != null;
+    // Pre-fill the form with existing data
+    _titleController.text = widget.bookData['title'] ?? '';
+    _authorController.text = widget.bookData['author'] ?? '';
+    _subjectController.text = widget.bookData['subject'] ?? '';
+    _descriptionController.text = widget.bookData['description'] ?? '';
+    _selectedCondition = widget.bookData['condition'] ?? 'Like New';
+    _selectedPriceType = widget.bookData['priceType'] ?? 'free';
     
-    // Pre-fill form if editing existing book
-    if (widget.initialBook != null) {
-      _prefillForm(widget.initialBook!);
+    if (widget.bookData['priceType'] == 'price') {
+      _priceController.text = widget.bookData['price']?.toString() ?? '';
     }
-  }
-
-  void _prefillForm(Map<String, dynamic> book) {
-    _titleController.text = book['title'] ?? '';
-    _authorController.text = book['author'] ?? '';
-    _subjectController.text = book['subject'] ?? '';
-    _descriptionController.text = book['description'] ?? '';
-    
-    setState(() {
-      _selectedCondition = book['condition'] ?? 'Like New';
-      _selectedPriceType = book['priceType'] ?? 'free';
-      _existingImageUrl = book['imageUrl'];
-      
-      if (book['priceType'] == 'price' && book['price'] != null) {
-        _priceController.text = book['price'].toStringAsFixed(2);
-      }
-    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          _isEditing ? 'Edit Book' : 'Post a Book',
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-        ),
+        title: Text('Edit Book'),
         backgroundColor: Colors.red,
         foregroundColor: Colors.white,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back),
-          onPressed: () {
-            Navigator.pop(context);
-          },
-        ),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.save),
+            onPressed: _isLoading ? null : _saveChanges,
+          ),
+        ],
       ),
-     
       body: _isLoading
           ? Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
@@ -108,7 +88,7 @@ class _PostABookState extends State<PostABook> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Book Image Upload
+                    // Book Image
                     _buildImageSection(),
                     SizedBox(height: 24),
 
@@ -180,12 +160,12 @@ class _PostABookState extends State<PostABook> {
                     _buildPriceTypeSection(),
                     SizedBox(height: 24),
 
-                    // Submit Button
+                    // Save Button
                     SizedBox(
                       width: double.infinity,
                       height: 50,
                       child: ElevatedButton(
-                        onPressed: _submitForm,
+                        onPressed: _saveChanges,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.red,
                           foregroundColor: Colors.white,
@@ -194,7 +174,7 @@ class _PostABookState extends State<PostABook> {
                           ),
                         ),
                         child: Text(
-                          _isEditing ? 'Update Book' : 'Post Book',
+                          'Save Changes',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
@@ -202,32 +182,6 @@ class _PostABookState extends State<PostABook> {
                         ),
                       ),
                     ),
-
-                    // Delete Button (only when editing)
-                    if (_isEditing) ...[
-                      SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: OutlinedButton(
-                          onPressed: _deleteBook,
-                          style: OutlinedButton.styleFrom(
-                            side: BorderSide(color: Colors.red),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: Text(
-                            'Delete Book',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.red,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ),
@@ -262,10 +216,10 @@ class _PostABookState extends State<PostABook> {
                     borderRadius: BorderRadius.circular(12),
                     child: Image.file(_selectedImage!, fit: BoxFit.cover),
                   )
-                : _existingImageUrl != null
+                : widget.bookData['imageUrl'] != null
                     ? ClipRRect(
                         borderRadius: BorderRadius.circular(12),
-                        child: Image.network(_existingImageUrl!, fit: BoxFit.cover),
+                        child: Image.network(widget.bookData['imageUrl']!, fit: BoxFit.cover),
                       )
                     : Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -273,23 +227,13 @@ class _PostABookState extends State<PostABook> {
                           Icon(Icons.camera_alt, size: 40, color: Colors.grey.shade400),
                           SizedBox(height: 8),
                           Text(
-                            'Tap to add book cover',
+                            'Tap to change book cover',
                             style: TextStyle(color: Colors.grey.shade500),
                           ),
                         ],
                       ),
           ),
         ),
-        if (_existingImageUrl != null || _selectedImage != null) ...[
-          SizedBox(height: 8),
-          TextButton(
-            onPressed: _removeImage,
-            child: Text(
-              'Remove Image',
-              style: TextStyle(color: Colors.red),
-            ),
-          ),
-        ],
       ],
     );
   }
@@ -444,32 +388,19 @@ class _PostABookState extends State<PostABook> {
     if (pickedFile != null) {
       setState(() {
         _selectedImage = File(pickedFile.path);
-        _existingImageUrl = null; // Clear existing URL when new image is selected
       });
     }
   }
 
-  void _removeImage() {
-    setState(() {
-      _selectedImage = null;
-      _existingImageUrl = null;
-    });
-  }
-
-  Future<void> _submitForm() async {
+  Future<void> _saveChanges() async {
     if (_formKey.currentState!.validate()) {
       setState(() {
         _isLoading = true;
       });
 
       try {
-        final user = _auth.currentUser;
-        if (user == null) {
-          throw Exception('User not authenticated');
-        }
-
         // Upload new image if selected
-        String? imageUrl = _existingImageUrl;
+        String? imageUrl = widget.bookData['imageUrl'];
         if (_selectedImage != null) {
           imageUrl = await _uploadImage(_selectedImage!);
         }
@@ -481,8 +412,8 @@ class _PostABookState extends State<PostABook> {
           _subjectController.text,
         );
 
-        // Prepare book data
-        final bookData = {
+        // Update book in Firestore
+        await _firestore.collection('books').doc(widget.bookId).update({
           'title': _titleController.text.trim(),
           'author': _authorController.text.trim(),
           'subject': _subjectController.text.trim(),
@@ -491,26 +422,14 @@ class _PostABookState extends State<PostABook> {
           'priceType': _selectedPriceType,
           'price': _selectedPriceType == 'price' ? double.parse(_priceController.text) : null,
           'imageUrl': imageUrl,
-          'userId': user.uid,
-          'userEmail': user.email!,
-          'updatedAt': FieldValue.serverTimestamp(),
           'searchKeywords': searchKeywords,
-        };
-
-        // Save to Firestore
-        if (_isEditing && widget.bookId != null) {
-          // Update existing book
-          await _firestore.collection('books').doc(widget.bookId).update(bookData);
-        } else {
-          // Create new book
-          bookData['createdAt'] = FieldValue.serverTimestamp();
-          await _firestore.collection('books').add(bookData);
-        }
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
 
         // Show success message and return to previous page
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(_isEditing ? 'Book updated successfully!' : 'Book posted successfully!'),
+            content: Text('Book updated successfully!'),
             backgroundColor: Colors.green,
           ),
         );
@@ -520,60 +439,7 @@ class _PostABookState extends State<PostABook> {
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      } finally {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _deleteBook() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Delete Book'),
-        content: Text('Are you sure you want to delete "${_titleController.text}"? This action cannot be undone.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(
-              'Delete',
-              style: TextStyle(color: Colors.red),
-            ),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true && widget.bookId != null) {
-      setState(() {
-        _isLoading = true;
-      });
-
-      try {
-        await _firestore.collection('books').doc(widget.bookId).delete();
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Book deleted successfully'),
-            backgroundColor: Colors.green,
-          ),
-        );
-
-        Navigator.pop(context); // Go back to previous screen
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error deleting book: $e'),
+            content: Text('Error updating book: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -587,9 +453,9 @@ class _PostABookState extends State<PostABook> {
 
   Future<String> _uploadImage(File image) async {
     try {
-      final user = _auth.currentUser!;
+      final user = FirebaseAuth.instance.currentUser!;
       final fileName = 'book_${DateTime.now().millisecondsSinceEpoch}_${user.uid}';
-      final ref = _storage.ref().child('book_covers/$fileName');
+      final ref = FirebaseStorage.instance.ref().child('book_covers/$fileName');
       
       final uploadTask = await ref.putFile(image);
       final downloadUrl = await uploadTask.ref.getDownloadURL();
@@ -617,8 +483,8 @@ class _PostABookState extends State<PostABook> {
     _titleController.dispose();
     _authorController.dispose();
     _subjectController.dispose();
-    _priceController.dispose();
     _descriptionController.dispose();
+    _priceController.dispose();
     super.dispose();
   }
 }

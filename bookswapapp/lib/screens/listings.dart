@@ -1,8 +1,7 @@
-import 'package:bookswapapp/screens/post_a_book.dart';
 import 'package:flutter/material.dart';
-import 'package:bookswapapp/screens/mylistings.dart';
-import 'package:bookswapapp/screens/chats.dart';
-import 'package:bookswapapp/screens/settings.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:bookswapapp/screens/post_a_book.dart';
 
 class Listings extends StatefulWidget {
   const Listings({super.key});
@@ -12,199 +11,471 @@ class Listings extends StatefulWidget {
 }
 
 class _ListingsState extends State<Listings> {
-  int _currentIndex = 0;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   @override
   Widget build(BuildContext context) {
+    final user = _auth.currentUser;
+    
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'Listings',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black),
+          'My Books',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
         ),
         backgroundColor: Colors.red,
+        actions: [
+          IconButton(
+            icon: Icon(Icons.add),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => PostABook()),
+              );
+            },
+          ),
+        ],
       ),
-     
-      body: _getCurrentPage(),
+      body: user == null
+          ? Center(
+              child: Text(
+                'Please log in to view your books',
+                style: TextStyle(fontSize: 16, color: Colors.grey),
+              ),
+            )
+          : StreamBuilder<QuerySnapshot>(
+              stream: _firestore
+                  .collection('books')
+                  .where('userId', isEqualTo: user.uid)
+                  .orderBy('createdAt', descending: true)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Center(child: CircularProgressIndicator(color: Colors.red));
+                }
 
-      floatingActionButton: _currentIndex == 0 ? FloatingActionButton(
-        onPressed: () {
-          Navigator.push(context, MaterialPageRoute(builder: (context) => PostABook()));
-        },
-        backgroundColor: Colors.red,
-        foregroundColor: Colors.white,
-        child: Icon(Icons.add),
-      ) : null,
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Text(
+                      'Error loading your books',
+                      style: TextStyle(color: Colors.black),
+                    ),
+                  );
+                }
 
-      bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: Colors.red, 
-        selectedItemColor: Colors.black,
-        unselectedItemColor: Colors.white,
-        selectedLabelStyle: TextStyle(fontWeight: FontWeight.bold),
-        unselectedLabelStyle: TextStyle(fontWeight: FontWeight.normal),
-        iconSize: 30,
-        currentIndex: _currentIndex,
-        type: BottomNavigationBarType.fixed,
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
+                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                  return _buildEmptyState();
+                }
+
+                final books = snapshot.data!.docs;
+
+                return ListView.builder(
+                  padding: EdgeInsets.all(16),
+                  itemCount: books.length,
+                  itemBuilder: (context, index) {
+                    final book = books[index].data() as Map<String, dynamic>;
+                    return _buildBookItem(book, books[index].id);
+                  },
+                );
+              },
+            ),
+    );
+  }
+
+  Widget _buildBookItem(Map<String, dynamic> book, String bookId) {
+    return Card(
+      margin: EdgeInsets.only(bottom: 12),
+      child: ListTile(
+        leading: Container(
+          width: 50,
+          height: 50,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(4),
+            color: Colors.grey[200],
+          ),
+          child: book['imageUrl'] != null
+              ? ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: Image.network(book['imageUrl']!, fit: BoxFit.cover),
+                )
+              : Center(
+                  child: Icon(Icons.menu_book, color: Colors.grey[500]),
+                ),
+        ),
+        title: Text(
+          book['title'] ?? 'No Title',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('by ${book['author'] ?? 'Unknown'}'),
+            SizedBox(height: 4),
+            Row(
+              children: [
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: _getConditionColor(book['condition']),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    book['condition'] ?? 'Unknown',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                SizedBox(width: 8),
+                Text(
+                  _getPriceText(book),
+                  style: TextStyle(
+                    color: Colors.red,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        trailing: PopupMenuButton<String>(
+          onSelected: (value) {
+            if (value == 'edit') {
+              _editBook(book, bookId);
+            } else if (value == 'delete') {
+              _deleteBook(book, bookId);
+            }
+          },
+          itemBuilder: (BuildContext context) => [
+            PopupMenuItem(
+              value: 'edit',
+              child: Row(
+                children: [
+                  Icon(Icons.edit, size: 20),
+                  SizedBox(width: 8),
+                  Text('Edit'),
+                ],
+              ),
+            ),
+            PopupMenuItem(
+              value: 'delete',
+              child: Row(
+                children: [
+                  Icon(Icons.delete, size: 20, color: Colors.red),
+                  SizedBox(width: 8),
+                  Text('Delete', style: TextStyle(color: Colors.red)),
+                ],
+              ),
+            ),
+          ],
+        ),
+        onTap: () {
+          _showBookDetails(book, bookId);
         },
-        items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home_max_rounded),
-            label: 'Home',
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.library_books, size: 64, color: Colors.grey[400]),
+          SizedBox(height: 16),
+          Text(
+            'No books listed yet',
+            style: TextStyle(fontSize: 18, color: Colors.grey[600]),
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.book),
-            label: 'My Listings',
+          SizedBox(height: 8),
+          Text(
+            'Tap the + button to add your first book!',
+            style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+            textAlign: TextAlign.center,
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.chat),
-            label: 'Chats',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.settings),
-            label: 'Settings',
+          SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => PostABook()),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: Text('Add Your First Book'),
           ),
         ],
       ),
     );
   }
 
-  Widget _getCurrentPage() {
-    switch (_currentIndex) {
-      case 0:
-        return _buildHomeContent();
-      case 1:
-        return MyListings();
-      case 2:
-        return ChatsPage();
-      case 3:
-        return Settings();
+  Color _getConditionColor(String? condition) {
+    switch (condition?.toLowerCase()) {
+      case 'new':
+        return Colors.green;
+      case 'like new':
+        return Colors.lightGreen;
+      case 'good':
+        return Colors.orange;
+      case 'fair':
+        return Colors.orangeAccent;
+      case 'poor':
+        return Colors.red;
       default:
-        return _buildHomeContent();
+        return Colors.grey;
     }
   }
 
-  Widget _buildHomeContent() {
-    return Column(
-      children: [
-        // Search Bar
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: TextField(
-            decoration: InputDecoration(
-              hintText: 'Search books by title, author, or subject...',
-              prefixIcon: Icon(Icons.search),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-              contentPadding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-            ),
-          ),
-        ),
-        
-      
-        
-        SizedBox(height: 16),
-        
-        // Book Listings Grid
-        Expanded(
-          child: GridView.builder(
-            padding: EdgeInsets.all(16),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-              childAspectRatio: 0.65,
-            ),
-            itemCount: 6, // Example books
-            itemBuilder: (context, index) {
-              return _buildBookCard(index);
-            },
-          ),
-        ),
-      ],
-    );
+  String _getPriceText(Map<String, dynamic> book) {
+    if (book['priceType'] == 'free') {
+      return 'Free';
+    } else if (book['priceType'] == 'swap') {
+      return 'Swap';
+    } else {
+      return '\$${book['price']?.toStringAsFixed(2) ?? '0'}';
+    }
   }
 
-  Widget _buildFilterChip(String label) {
-    return Container(
-      margin: EdgeInsets.only(right: 8),
-      child: FilterChip(
-        label: Text(label),
-        onSelected: (bool value) {
-          // Handle filter selection
-        },
-        backgroundColor: Colors.grey[200],
-        selectedColor: Colors.red[100],
-        labelStyle: TextStyle(color: Colors.black),
+  void _editBook(Map<String, dynamic> book, String bookId) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PostABook(
+          bookId: bookId,
+          initialBook: book,
+        ),
       ),
     );
   }
 
-  Widget _buildBookCard(int index) {
-    // Example book data
-    List<Map<String, String>> books = [
-      {'title': 'Data Structures & Algorithms', 'subject': 'Computer Science', 'condition': 'Like New', 'price': 'Free'},
-      {'title': 'Introduction to Psychology', 'subject': 'Psychology', 'condition': 'Good', 'price': 'Swap'},
-      {'title': 'Calculus Early Transcendentals', 'subject': 'Mathematics', 'condition': 'Fair', 'price': '\$10'},
-      {'title': 'The Great Gatsby', 'subject': 'Literature', 'condition': 'Excellent', 'price': 'Free'},
-      {'title': 'Organic Chemistry', 'subject': 'Chemistry', 'condition': 'Good', 'price': 'Swap'},
-      {'title': 'Physics for Scientists', 'subject': 'Physics', 'condition': 'Like New', 'price': '\$15'},
-    ];
+  void _deleteBook(Map<String, dynamic> book, String bookId) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Delete Book'),
+          content: Text('Are you sure you want to delete "${book['title']}"?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(context);
+                await _performDelete(bookId);
+              },
+              child: Text(
+                'Delete',
+                style: TextStyle(color: Colors.red),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
-    final book = books[index];
+  Future<void> _performDelete(String bookId) async {
+    try {
+      await _firestore.collection('books').doc(bookId).delete();
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Book deleted successfully'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error deleting book: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
 
-    return Card(
-      elevation: 2,
+  void _showBookDetails(Map<String, dynamic> book, String bookId) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        return Container(
+          padding: EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Book Image and Basic Info
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Book Cover
+                  Container(
+                    width: 100,
+                    height: 150,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      color: Colors.grey[200],
+                    ),
+                    child: book['imageUrl'] != null
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.network(book['imageUrl']!, fit: BoxFit.cover),
+                          )
+                        : Center(
+                            child: Icon(Icons.menu_book, size: 40, color: Colors.grey[500]),
+                          ),
+                  ),
+                  SizedBox(width: 16),
+                  // Book Details
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          book['title'] ?? 'No Title',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'by ${book['author'] ?? 'Unknown Author'}',
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 14,
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: _getConditionColor(book['condition']),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            book['condition'] ?? 'Unknown',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          _getPriceText(book),
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 16),
+              
+              // Additional Details
+              if (book['subject'] != null) ...[
+                _buildDetailRow('Subject', book['subject']!),
+              ],
+              if (book['description'] != null && book['description'].toString().isNotEmpty) ...[
+                _buildDetailRow('Description', book['description']!),
+              ],
+              _buildDetailRow('Posted by', 'You'),
+              
+              SizedBox(height: 20),
+              
+              // Action Buttons
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _editBook(book, bookId);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        foregroundColor: Colors.white,
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      child: Text('Edit Book'),
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _deleteBook(book, bookId);
+                      },
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: Colors.red),
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      child: Text(
+                        'Delete',
+                        style: TextStyle(color: Colors.red),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              
+              SizedBox(height: 8),
+              
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                  },
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: Colors.grey),
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: Text('Close'),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Book Image
-          Container(
-            height: 100,
-            width: double.infinity,
-            color: Colors.grey[200],
-            child: Icon(Icons.menu_book, size: 50, color: Colors.grey[500]),
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.grey[600],
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
           ),
-          
-          // Book Details
-          Padding(
-            padding: EdgeInsets.all(8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  book['title']!,
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                SizedBox(height: 4),
-                Text(
-                  book['subject']!,
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                ),
-                SizedBox(height: 2),
-                Text(
-                  book['condition']!,
-                  style: TextStyle(fontSize: 11, color: Colors.green, fontWeight: FontWeight.w500),
-                ),
-                SizedBox(height: 6),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      book['price']!,
-                      style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red, fontSize: 14),
-                    ),
-                    Icon(Icons.favorite_border, size: 18, color: Colors.grey),
-                  ],
-                ),
-              ],
+          SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 14,
             ),
           ),
         ],

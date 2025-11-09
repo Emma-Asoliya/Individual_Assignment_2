@@ -93,4 +93,8 @@ class UserProvider with ChangeNotifier {
     _error = null;
     notifyListeners();
   }
+
+  void setLoading(bool bool) {}
+
+  void setError(String errorMessage) {}
 }

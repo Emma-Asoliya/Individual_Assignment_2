@@ -1,196 +1,536 @@
-import 'package:bookswapapp/screens/listings.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:bookswapapp/screens/signin.dart';
 
-class Signup extends StatefulWidget {
-  const Signup({super.key});
+class SignupPage extends StatefulWidget {
+  const SignupPage({super.key});
 
   @override
-  State<Signup> createState() => _SignupState();
+  State<SignupPage> createState() => _SignupPageState();
 }
 
-class _SignupState extends State<Signup> {
+class _SignupPageState extends State<SignupPage> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
-  final _usernameController = TextEditingController();
+  final _auth = FirebaseAuth.instance;
+  final _firestore = FirebaseFirestore.instance;
+  
+  final TextEditingController _firstNameController = TextEditingController();
+  final TextEditingController _lastNameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _confirmPasswordController = TextEditingController();
+
   bool _isLoading = false;
-
-  void _signup() async {
-    if(_formKey.currentState!.validate()) {
-      setState(() => _isLoading = true);
-      
-      await Future.delayed(Duration(seconds:3));
-
-      setState(() => _isLoading = false);
-
-  Navigator.pushReplacementNamed(context, '/listings');
-  }
-  }
-
-  @override
-  void dispose () {
-    _emailController.dispose();
-    _passwordController.dispose();
-    _confirmPasswordController.dispose();
-    _usernameController.dispose();
-  }
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(
+      backgroundColor: Colors.white,
+      body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(30),
+          padding: const EdgeInsets.all(24.0),
           child: Form(
-          key: _formKey, 
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Icon(Icons.menu_book_rounded,
-              size: 80,
-              color: Colors.red,),
-              SizedBox(height: 25), 
-
-              TextFormField(
-                controller: _usernameController,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return "Insert full name here";
-                  }
-                  return null;
-                },
-                decoration: InputDecoration(
-                  labelText: 'Full Name',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8)
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Back Button
+                IconButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                  },
+                  icon: Icon(Icons.arrow_back, color: Colors.black),
+                  padding: EdgeInsets.zero,
+                  constraints: BoxConstraints(),
+                ),
+                
+                SizedBox(height: 20),
+                
+                // Title
+                Text(
+                  'Create Account',
+                  style: TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
                   ),
                 ),
-              ),
-                SizedBox(height: 16),
-
-                TextFormField(
-                  controller: _emailController,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Insert email here';
-                    }
-                    if (!value.contains('@')) {
-                      return ' Enter a valid email';
-                    }
-                    return null;
-                  },
-                  decoration: InputDecoration(
-                    labelText: 'Email',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8)
-                    )
+                
+                SizedBox(height: 8),
+                
+                Text(
+                  'Sign up to start swapping books',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey[600],
                   ),
-                  keyboardType: TextInputType.emailAddress,
                 ),
-                SizedBox(height: 14),
-
-                TextFormField(
-                  controller: _passwordController,
-                  obscureText: true,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return ' Insert Password';
-                    }
-                    if (value.length < 8) {
-                      return 'Password must be atleast 8 characters';
-                    }
-                    return null;
-                  },
-                  decoration: InputDecoration(
-                    labelText: 'Password',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8)
+                
+                SizedBox(height: 32),
+                
+                // First Name & Last Name Row
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildTextField(
+                        controller: _firstNameController,
+                        label: 'First Name',
+                        hintText: 'Ngozi',
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter your first name';
+                          }
+                          return null;
+                        },
+                      ),
                     ),
-                  ),
+                    
+                    SizedBox(width: 16),
+                    
+                    Expanded(
+                      child: _buildTextField(
+                        controller: _lastNameController,
+                        label: 'Last Name',
+                        hintText: 'Chukwueze',
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter your last name';
+                          }
+                          return null;
+                        },
+                      ),
+                    ),
+                  ],
                 ),
-                SizedBox(height: 14),
-
-                TextFormField(
-                  controller: _confirmPasswordController,
-                  obscureText: true,
+                
+                SizedBox(height: 20),
+                
+                // Email
+                _buildTextField(
+                  controller: _emailController,
+                  label: 'Email',
+                  hintText: 'n.chukwueze@alustudent.com',
+                  keyboardType: TextInputType.emailAddress,
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return 'Confirm your password';
+                      return 'Please enter your email';
+                    }
+                    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                      return 'Please enter a valid email';
+                    }
+                    return null;
+                  },
+                ),
+                
+                SizedBox(height: 20),
+                
+                // Password
+                _buildPasswordField(
+                  controller: _passwordController,
+                  label: 'Password',
+                  hintText: 'Enter your password',
+                  obscureText: _obscurePassword,
+                  onToggleVisibility: () {
+                    setState(() {
+                      _obscurePassword = !_obscurePassword;
+                    });
+                  },
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter a password';
+                    }
+                    if (value.length < 6) {
+                      return 'Password must be at least 6 characters';
+                    }
+                    return null;
+                  },
+                ),
+                
+                SizedBox(height: 20),
+                
+                // Confirm Password
+                _buildPasswordField(
+                  controller: _confirmPasswordController,
+                  label: 'Confirm Password',
+                  hintText: 'Confirm your password',
+                  obscureText: _obscureConfirmPassword,
+                  onToggleVisibility: () {
+                    setState(() {
+                      _obscureConfirmPassword = !_obscureConfirmPassword;
+                    });
+                  },
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please confirm your password';
                     }
                     if (value != _passwordController.text) {
                       return 'Passwords do not match';
                     }
                     return null;
                   },
-                  decoration: InputDecoration(
-                    labelText: 'Confirm Password',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8)
-                    ),
-                  ),
                 ),
-                SizedBox(height: 25),
-
+                
+                SizedBox(height: 32),
+                
+                // Sign Up Button
                 SizedBox(
                   width: double.infinity,
-                  height: 50,
+                  height: 56,
                   child: ElevatedButton(
-                    onPressed: _isLoading ? null : _signup,
+                    onPressed: _isLoading ? null : _signUp,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.red,
+                      foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8)
-                      )
-                    ), child: _isLoading
-                    ? SizedBox(
-                      height: 18,
-                      width: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation(Colors.white),
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                    )
-                    : Text(
-                      'Sign Up',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold
+                      elevation: 2,
+                    ),
+                    child: _isLoading
+                        ? SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : Text(
+                            'Create Account',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                  ),
+                ),
+                
+                SizedBox(height: 24),
+                
+                // Already have an account
+                Center(
+                  child: GestureDetector(
+                    onTap: () {
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(builder: (context) => LoginPage()),
+                      );
+                    },
+                    child: RichText(
+                      text: TextSpan(
+                        text: 'Already have an account? ',
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 14,
+                        ),
+                        children: [
+                          TextSpan(
+                            text: 'Sign In',
+                            style: TextStyle(
+                              color: Colors.red,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
                 ),
-                SizedBox(height: 18),
-
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'Already have an account?',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.red
-                      ),
-                    ),
-                    TextButton(onPressed: () {
-                      Navigator.pop(context);
-                    }, 
-                    child: Text(
-                      'Log In',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.red
-                      ),
-                    ))
-                  ],
-                )
-            ],
+              ],
+            ),
           ),
         ),
       ),
-    )
     );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required String hintText,
+    TextInputType? keyboardType,
+    String? Function(String?)? validator,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontWeight: FontWeight.w500,
+            color: Colors.black87,
+            fontSize: 14,
+          ),
+        ),
+        SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          keyboardType: keyboardType,
+          validator: validator,
+          decoration: InputDecoration(
+            hintText: hintText,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey[300]!),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.red, width: 2),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.red),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.red, width: 2),
+            ),
+            contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPasswordField({
+    required TextEditingController controller,
+    required String label,
+    required String hintText,
+    required bool obscureText,
+    required VoidCallback onToggleVisibility,
+    required String? Function(String?)? validator,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontWeight: FontWeight.w500,
+            color: Colors.black87,
+            fontSize: 14,
+          ),
+        ),
+        SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          obscureText: obscureText,
+          validator: validator,
+          decoration: InputDecoration(
+            hintText: hintText,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey[300]!),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.red, width: 2),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.red),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.red, width: 2),
+            ),
+            contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            suffixIcon: IconButton(
+              onPressed: onToggleVisibility,
+              icon: Icon(
+                obscureText ? Icons.visibility : Icons.visibility_off,
+                color: Colors.grey[600],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _signUp() async {
+    if (_formKey.currentState!.validate()) {
+      setState(() {
+        _isLoading = true;
+      });
+
+      try {
+        // Create user with Firebase Auth
+        UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
+          email: _emailController.text.trim(),
+          password: _passwordController.text.trim(),
+        );
+
+        final User? user = userCredential.user;
+        
+        if (user != null) {
+          // Update display name
+          await user.updateDisplayName('${_firstNameController.text.trim()} ${_lastNameController.text.trim()}');
+          
+          // Send email verification
+          await user.sendEmailVerification();
+
+          // Store additional user data in Firestore
+          await _firestore.collection('users').doc(user.uid).set({
+            'firstName': _firstNameController.text.trim(),
+            'lastName': _lastNameController.text.trim(),
+            'fullName': '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}',
+            'email': _emailController.text.trim(),
+            'emailVerified': false,
+            'createdAt': FieldValue.serverTimestamp(),
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+
+          // Show verification dialog instead of navigating to app
+          await _showVerificationDialog();
+        }
+
+      } on FirebaseAuthException catch (e) {
+        String errorMessage = 'An error occurred. Please try again.';
+        
+        if (e.code == 'email-already-in-use') {
+          errorMessage = 'This email is already registered. Please use a different email or sign in.';
+        } else if (e.code == 'weak-password') {
+          errorMessage = 'The password is too weak. Please choose a stronger password.';
+        } else if (e.code == 'invalid-email') {
+          errorMessage = 'The email address is invalid. Please check and try again.';
+        }
+        
+        _showErrorDialog(errorMessage);
+      } catch (e) {
+        _showErrorDialog('An unexpected error occurred. Please try again.');
+      } finally {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _showVerificationDialog() async {
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.email, color: Colors.orange),
+            SizedBox(width: 8),
+            Text('Verify Your Email'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'A verification email has been sent to:',
+              style: TextStyle(fontSize: 14),
+            ),
+            SizedBox(height: 8),
+            Text(
+              _emailController.text.trim(),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.red,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Please check your inbox and verify your email address before you can log in to BookSwap.',
+              style: TextStyle(fontSize: 14),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: 16),
+            Container(
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange[50],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info, color: Colors.orange, size: 20),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'You must verify your email to access the app',
+                      style: TextStyle(fontSize: 12, color: Colors.orange[800]),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context); // Close dialog
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => LoginPage()),
+              );
+            },
+            child: Text('OK, Go to Login'),
+          ),
+          TextButton(
+            onPressed: () async {
+              final User? user = _auth.currentUser;
+              if (user != null) {
+                try {
+                  await user.sendEmailVerification();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Verification email resent!'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to resend email: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            child: Text('Resend Email'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Sign Up Failed'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            child: Text('OK', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _firstNameController.dispose();
+    _lastNameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
   }
 }

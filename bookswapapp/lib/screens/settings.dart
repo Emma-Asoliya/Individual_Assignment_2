@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Settings extends StatefulWidget {
   const Settings({super.key});
@@ -10,15 +12,39 @@ class Settings extends StatefulWidget {
 
 class _SettingsState extends State<Settings> {
   bool _notificationsEnabled = true;
-  bool _saveLoginInfo = true;
-  String _userName = 'John Doe';
-  String _userEmail = 'john.doe@example.com';
-  String _userBio = 'Book enthusiast and avid reader';
+  String _userName = 'Loading...';
+  String _userEmail = 'Loading...';
+
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   @override
   void initState() {
     super.initState();
+    _loadUserData();
     _loadSettings();
+  }
+
+  // Load user data from Firebase
+  void _loadUserData() async {
+    final user = _auth.currentUser;
+    if (user != null) {
+      // Get user data from Firestore
+      final userDoc = await _firestore.collection('users').doc(user.uid).get();
+      if (userDoc.exists) {
+        final userData = userDoc.data()!;
+        setState(() {
+          _userName = '${userData['firstName'] ?? ''} ${userData['lastName'] ?? ''}'.trim();
+          _userEmail = user.email ?? 'No email';
+        });
+      } else {
+        // Fallback to auth data if no Firestore document
+        setState(() {
+          _userName = user.displayName ?? 'User';
+          _userEmail = user.email ?? 'No email';
+        });
+      }
+    }
   }
 
   // Load saved settings from SharedPreferences
@@ -26,21 +52,13 @@ class _SettingsState extends State<Settings> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _notificationsEnabled = prefs.getBool('notifications') ?? true;
-      _saveLoginInfo = prefs.getBool('saveLogin') ?? true;
-      _userName = prefs.getString('userName') ?? 'John Doe';
-      _userEmail = prefs.getString('userEmail') ?? 'john.doe@example.com';
-      _userBio = prefs.getString('userBio') ?? 'Book enthusiast and avid reader';
     });
   }
 
   // Save settings to SharedPreferences
-  void _saveSetting(String key, dynamic value) async {
+  void _saveSetting(String key, bool value) async {
     final prefs = await SharedPreferences.getInstance();
-    if (value is bool) {
-      await prefs.setBool(key, value);
-    } else if (value is String) {
-      await prefs.setString(key, value);
-    }
+    await prefs.setBool(key, value);
   }
 
   void _showLogoutDialog() {
@@ -57,7 +75,7 @@ class _SettingsState extends State<Settings> {
             ),
             TextButton(
               onPressed: () {
-                Navigator.pop(context);
+                Navigator.pop(context); // Close the dialog first
                 _performLogout();
               },
               child: Text('Logout', style: TextStyle(color: Colors.red)),
@@ -68,31 +86,39 @@ class _SettingsState extends State<Settings> {
     );
   }
 
-  void _performLogout() {
-    // Clear saved login info if user chooses
-    if (!_saveLoginInfo) {
-      _clearLoginData();
+  Future<void> _performLogout() async {
+    try {
+      await _auth.signOut();
+      
+      // Show logout confirmation
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Successfully logged out'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      
+      // Navigate to login page
+      Navigator.pushNamedAndRemoveUntil(
+        context, 
+        '/login',  // Make sure you have this route defined
+        (route) => false,
+      );
+      
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error during logout: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
-    
-    // Navigate to login page
-    Navigator.pushReplacementNamed(context, '/login');
-    
-    // Show logout confirmation
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Successfully logged out')),
-    );
-  }
-
-  void _clearLoginData() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('userEmail');
-    await prefs.remove('userPassword');
   }
 
   void _showEditProfileDialog() {
-    final nameController = TextEditingController(text: _userName);
-    final emailController = TextEditingController(text: _userEmail);
-    final bioController = TextEditingController(text: _userBio);
+    final nameParts = _userName.split(' ');
+    final firstNameController = TextEditingController(text: nameParts.isNotEmpty ? nameParts[0] : '');
+    final lastNameController = TextEditingController(text: nameParts.length > 1 ? nameParts[1] : '');
     
     showDialog(
       context: context,
@@ -103,30 +129,28 @@ class _SettingsState extends State<Settings> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(
-                  controller: nameController,
-                  decoration: InputDecoration(
-                    labelText: 'Full Name',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                SizedBox(height: 12),
-                TextField(
-                  controller: emailController,
-                  decoration: InputDecoration(
-                    labelText: 'Email',
-                    border: OutlineInputBorder(),
-                  ),
-                  keyboardType: TextInputType.emailAddress,
-                ),
-                SizedBox(height: 12),
-                TextField(
-                  controller: bioController,
-                  decoration: InputDecoration(
-                    labelText: 'Bio',
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 3,
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: firstNameController,
+                        decoration: InputDecoration(
+                          labelText: 'First Name',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: TextField(
+                        controller: lastNameController,
+                        decoration: InputDecoration(
+                          labelText: 'Last Name',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -137,19 +161,12 @@ class _SettingsState extends State<Settings> {
               child: Text('Cancel'),
             ),
             TextButton(
-              onPressed: () {
-                setState(() {
-                  _userName = nameController.text;
-                  _userEmail = emailController.text;
-                  _userBio = bioController.text;
-                  _saveSetting('userName', _userName);
-                  _saveSetting('userEmail', _userEmail);
-                  _saveSetting('userBio', _userBio);
-                });
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Profile updated successfully')),
+              onPressed: () async {
+                await _updateProfile(
+                  firstNameController.text,
+                  lastNameController.text,
                 );
+                Navigator.pop(context);
               },
               child: Text('Save'),
             ),
@@ -159,13 +176,44 @@ class _SettingsState extends State<Settings> {
     );
   }
 
+  Future<void> _updateProfile(String firstName, String lastName) async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    try {
+      await _firestore.collection('users').doc(user.uid).update({
+        'firstName': firstName,
+        'lastName': lastName,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      setState(() {
+        _userName = '$firstName $lastName'.trim();
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Profile updated successfully'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error updating profile: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text(
           'Settings',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black),
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
         ),
         backgroundColor: Colors.red,
       ),
@@ -201,22 +249,12 @@ class _SettingsState extends State<Settings> {
               leading: CircleAvatar(
                 backgroundColor: Colors.red,
                 child: Text(
-                  _userName[0],
+                  _userName.isNotEmpty ? _userName[0].toUpperCase() : 'U',
                   style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                 ),
               ),
               title: Text(_userName, style: TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(_userEmail),
-                  SizedBox(height: 4),
-                  Text(
-                    _userBio,
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                  ),
-                ],
-              ),
+              subtitle: Text(_userEmail),
               trailing: IconButton(
                 icon: Icon(Icons.edit, color: Colors.red),
                 onPressed: _showEditProfileDialog,
@@ -248,17 +286,6 @@ class _SettingsState extends State<Settings> {
               setState(() {
                 _notificationsEnabled = value;
                 _saveSetting('notifications', value);
-              });
-            },
-          ),
-          _buildSettingsSwitch(
-            title: 'Save Login Information',
-            subtitle: 'Keep me logged in on this device',
-            value: _saveLoginInfo,
-            onChanged: (value) {
-              setState(() {
-                _saveLoginInfo = value;
-                _saveSetting('saveLogin', value);
               });
             },
           ),
